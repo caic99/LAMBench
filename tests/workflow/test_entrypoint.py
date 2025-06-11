@@ -42,3 +42,13 @@ def test_gather_task_type_with_skip(dp_model, dp_model_skip_tasks):
     mock_database.count.return_value = 0
     tasks = gather_task_type(models, task_class)
     assert len(tasks) == 40
+
+
+def test_gather_task_type_skip_database(dp_model):
+    models = [dp_model]
+    task_class = PropertyFinetuneTask
+    mock_database = MagicMock()
+    task_class.record_type = mock_database
+    mock_database.count.return_value = 1
+    tasks = gather_task_type(models, task_class, skip_database=True)
+    assert len(tasks) == 40

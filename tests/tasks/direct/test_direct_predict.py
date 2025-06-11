@@ -88,3 +88,30 @@ def test_run_task_no_existing_record(
     mock_record_count.assert_called_once_with(
         task_name=direct_task_data["task_name"], model_name="model1"
     )
+
+
+def test_run_task_skip_database(
+    mock_record_count,
+    mock_record_insert,
+    valid_model_data,
+    direct_task_data,
+    caplog,
+):
+    mock_record_count.return_value = 1
+    model = DPModel(**valid_model_data)
+    with (
+        patch.object(
+            DPModel, "evaluate", return_value={"energy_rmse": 0.42}
+        ) as mock_run_task,
+        caplog.at_level(logging.INFO),
+    ):
+        task = DirectPredictTask(**direct_task_data)
+        task.run_task(model, skip_database=True)
+
+    mock_run_task.assert_called_once()
+    assert (
+        f"TASK {direct_task_data['task_name']} OUTPUT: {{'energy_rmse': 0.42}}, SKIP SAVING."
+        in caplog.text
+    )
+    mock_record_count.assert_not_called()
+    mock_record_insert.assert_not_called()
