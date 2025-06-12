@@ -29,6 +29,11 @@ pip install git+https://github.com/deepmodeling/LAMBench.git#egg=lambench[deepmd
 
 The optional dependencies are required for the corresponding models.
 
+By default, LAMBench stores benchmark results in a local SQLite database located
+in the system's temporary directory. Set the environment variable
+`LAMBENCH_SQLITE_PATH` to override the location or configure the `MYSQL_*`
+variables to use an external MySQL database instead.
+
 ## Usage
 
 To reproduce the results locally or test a custom model, please refer to the `ASEModel.evaluate` method.
