@@ -44,6 +44,8 @@ def submit_tasks_dflow(
     *,
     skip_database: bool = False,
 ):
+    if not skip_database:
+        raise ValueError("skip_database cannot be False when using dflow")
     job_group_id: int = create_job_group(name)
     logging.info(
         "Job group created: "
