@@ -1,5 +1,6 @@
 import logging
 import tempfile
+import json
 from typing import ClassVar
 from pydantic import BaseModel, ConfigDict
 from pathlib import Path
@@ -63,6 +64,20 @@ class BaseTask(BaseModel):
         task_output = model.evaluate(task=self)
         if skip_database:
             logging.info(f"TASK {self.task_name} OUTPUT: {task_output}, SKIP SAVING.")
+            result_file = self.workdir / f"{model.model_name}#{self.task_name}.json"
+            result_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(result_file, "w") as f:
+                json.dump(
+                    {
+                        "model_name": model.model_name,
+                        "task_name": self.task_name,
+                        **task_output,
+                    },
+                    f,
+                    indent=2,
+                )
+                f.write("\n")
+            logging.info(f"Result saved to {result_file}")
         else:
             logging.info(f"TASK {self.task_name} OUTPUT: {task_output}, INSERTING.")
             self.record_type(
