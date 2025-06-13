@@ -2,6 +2,9 @@ from lambench.tasks import DirectPredictTask
 from lambench.models.dp_models import DPModel
 from unittest.mock import patch
 import logging
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 def test_load_direct_predict_task(direct_yml_data):
@@ -88,3 +91,36 @@ def test_run_task_no_existing_record(
     mock_record_count.assert_called_once_with(
         task_name=direct_task_data["task_name"], model_name="model1"
     )
+
+
+def test_run_task_skip_database(
+    mock_record_count,
+    mock_record_insert,
+    valid_model_data,
+    direct_task_data,
+    caplog,
+):
+    mock_record_count.return_value = 1
+    model = DPModel(**valid_model_data)
+    with TemporaryDirectory() as tmpdir:
+        with (
+            patch.object(
+                DPModel, "evaluate", return_value={"energy_rmse": 0.42}
+            ) as mock_run_task,
+            caplog.at_level(logging.INFO),
+        ):
+            task = DirectPredictTask(**direct_task_data)
+            task.workdir = Path(tmpdir)
+            task.run_task(model, skip_database=True)
+            result_file = Path(tmpdir) / f"{model.model_name}#{task.task_name}.json"
+            assert result_file.exists()
+            with open(result_file) as f:
+                assert json.load(f)["energy_rmse"] == 0.42
+
+    mock_run_task.assert_called_once()
+    assert (
+        f"TASK {direct_task_data['task_name']} OUTPUT: {{'energy_rmse': 0.42}}, SKIP SAVING."
+        in caplog.text
+    )
+    mock_record_count.assert_not_called()
+    mock_record_insert.assert_not_called()

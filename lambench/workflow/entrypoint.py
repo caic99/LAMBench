@@ -47,6 +47,8 @@ def gather_task_type(
     models: list[BaseLargeAtomModel],
     task_class: Type[BaseTask],
     task_names: Optional[list[str]] = None,
+    *,
+    skip_database: bool = False,
 ) -> job_list:
     """
     Gather tasks of a specific type from the task file.
@@ -65,7 +67,7 @@ def gather_task_type(
             ):
                 continue
             task = task_class(task_name=task_name, **task_params)
-            if not task.exist(model.model_name):
+            if skip_database or not task.exist(model.model_name):
                 tasks.append((task, model))
     return tasks
 
@@ -74,6 +76,8 @@ def gather_jobs(
     model_names: Optional[list[str]] = None,
     task_names: Optional[list[str]] = None,
     task_types: Optional[list[Type[BaseTask]]] = None,
+    *,
+    skip_database: bool = False,
 ) -> job_list:
     jobs: job_list = []
 
@@ -88,7 +92,10 @@ def gather_jobs(
             continue
         jobs.extend(
             gather_task_type(
-                models=models, task_class=task_class, task_names=task_names
+                models=models,
+                task_class=task_class,
+                task_names=task_names,
+                skip_database=skip_database,
             )
         )
 
@@ -120,29 +127,37 @@ def main():
         action="store_true",
         help="Run tasks locally.",
     )
+    parser.add_argument(
+        "--skip-database",
+        action="store_true",
+        help="Skip database check and saving results.",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
 
     jobs = gather_jobs(
-        model_names=args.models, task_names=args.tasks, task_types=args.task_types
+        model_names=args.models,
+        task_names=args.tasks,
+        task_types=args.task_types,
+        skip_database=args.skip_database,
     )
     if not jobs:
         logging.warning("No jobs found, exiting.")
         return
     logging.info(f"Found {len(jobs)} jobs.")
     if args.local:
-        submit_tasks_local(jobs)
+        submit_tasks_local(jobs, skip_database=args.skip_database)
     else:
         from lambench.workflow.dflow import submit_tasks_dflow
 
-        submit_tasks_dflow(jobs)
+        submit_tasks_dflow(jobs, skip_database=args.skip_database)
 
 
-def submit_tasks_local(jobs: job_list) -> None:
+def submit_tasks_local(jobs: job_list, *, skip_database: bool = False) -> None:
     for task, model in jobs:
         logging.info(f"Running task={task.task_name}, model={model.model_name}")
         try:
-            task.run_task(model)
+            task.run_task(model, skip_database=skip_database)
         except ModuleNotFoundError as e:
             logging.error(e)  # Import error for ASE models
         except Exception as _:

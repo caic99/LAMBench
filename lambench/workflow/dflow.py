@@ -24,8 +24,9 @@ def run_task_op(
     task: BaseTask,
     model: BaseLargeAtomModel,
     dataset: Artifact(Path),  # type: ignore
+    skip_database: bool,
 ) -> NoneType:
-    task.run_task(model)
+    task.run_task(model, skip_database=skip_database)
 
 
 def get_dataset(paths: list[Optional[Path]]) -> Optional[list[BohriumDatasetsArtifact]]:
@@ -39,8 +40,12 @@ def get_dataset(paths: list[Optional[Path]]) -> Optional[list[BohriumDatasetsArt
 
 def submit_tasks_dflow(
     jobs: job_list,
-    name="lambench",
+    name: str = "lambench",
+    *,
+    skip_database: bool = False,
 ):
+    if not skip_database:
+        raise ValueError("skip_database cannot be False when using dflow")
     job_group_id: int = create_job_group(name)
     logging.info(
         "Job group created: "
@@ -63,6 +68,7 @@ def submit_tasks_dflow(
             parameters={
                 "task": task,
                 "model": model,
+                "skip_database": skip_database,
             },
             artifacts={"dataset": get_dataset([model.model_path, task.test_data])},
             executor=DispatcherExecutor(

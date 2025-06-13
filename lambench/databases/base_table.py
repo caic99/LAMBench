@@ -1,6 +1,8 @@
 from __future__ import annotations  # For class method return type hinting
 
 import os
+import tempfile
+from pathlib import Path
 from typing import Sequence
 
 
@@ -13,8 +15,8 @@ from sqlalchemy import (
     create_engine,
     func,
 )
-from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import declarative_base, sessionmaker
 from time import sleep
 
 Base = declarative_base()
@@ -24,10 +26,20 @@ db_username = os.environ.get("MYSQL_USERNAME")
 db_password = os.environ.get("MYSQL_PASSWORD")
 db_host = os.environ.get("MYSQL_HOST")
 db_name = os.environ.get("MYSQL_DATABASE_NAME")
-db = create_engine(
-    "mysql+pymysql://%s:%s@%s:3306/%s?charset=utf8"
-    % (db_username, db_password, db_host, db_name)
+sqlite_path = os.environ.get(
+    "LAMBENCH_SQLITE_PATH",
+    str(Path(tempfile.gettempdir()) / "lambench" / "lambench.db"),
 )
+
+if all([db_username, db_password, db_host, db_name]):
+    db = create_engine(
+        "mysql+pymysql://%s:%s@%s:3306/%s?charset=utf8"
+        % (db_username, db_password, db_host, db_name)
+    )
+else:
+    Path(sqlite_path).parent.mkdir(parents=True, exist_ok=True)
+    db = create_engine(f"sqlite:///{sqlite_path}")
+
 Session = sessionmaker(db)
 
 
@@ -41,6 +53,7 @@ class BaseRecord(Base):
     # NOTE: record_name = model_name + "#" + task_name
 
     def insert(self, max_retries: int = 2):
+        Base.metadata.create_all(db)
         for attempt in range(max_retries):
             try:
                 with Session() as session:
@@ -63,6 +76,7 @@ class BaseRecord(Base):
         Example:
             >>> PropertyRecord.query(model_name="TEST_DP_v1", task_name="task1")
         """
+        Base.metadata.create_all(db)
         with Session() as session:
             return session.query(cls).filter_by(**kwargs).all()
 
@@ -77,5 +91,6 @@ class BaseRecord(Base):
             >>> PropertyRecord.count(model_name="TEST_DP_v1", task_name="task1")
         """
 
+        Base.metadata.create_all(db)
         with Session() as session:
             return session.query(cls).filter_by(**kwargs).count()
